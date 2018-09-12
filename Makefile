@@ -1,5 +1,7 @@
 subject=./subjects/expr.lr1
 arg='1+1'
+python=/usr/bin/pypy
 
 run:
-	python ./src/main.py $(subject) $(arg)
+	$(python) $(debug) ./src/main.py $(subject) $(arg)
+
