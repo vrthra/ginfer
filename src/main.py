@@ -29,6 +29,25 @@ class Program:
         for i,a in enumerate(sarg):
             self.assignments[symarg[i].cache_key] = claripy.BVV(a)
 
+    def passing(self, constraint, n_succ):
+        # this might be the creation of a new symbol we need to register the value of
+        if constraint.op == '__eq__':
+            new_sym, new_val, new_val_conc = None, None, None
+
+            if constraint.args[0].op == 'BVS' and constraint.args[0].cache_key not in self.assignments:
+                new_sym, new_val = constraint.args
+            elif constraint.args[1].op == 'BVS' and constraint.args[1].cache_key not in self.assignments:
+                new_val, new_sym = constraint.args
+
+            if new_sym is None: return False
+
+            assert(n_succ == 1)
+            new_val_conc = new_val.replace_dict(self.assignments)
+            assert(new_val_conc.op == 'BVV')
+            self.assignments[new_sym.cache_key] = new_val_conc
+            return True
+        return False
+
     def run(self):
         state = self.initial_state
         passed = set()
@@ -37,44 +56,25 @@ class Program:
 
             # do our own smart constraint solving since z3 is a blunt instrument
             successors = []
+            n_succ = len(succ.successors)
             for succ_state in succ.successors:
-                for constraint in succ_state.solver.constraints:
-                    # if we've already validated this don't bother
-                    if constraint.cache_key in passed:
+                remaining_constraints = [c
+                        for c in succ_state.solver.constraints
+                        if c.cache_key not in passed]
+                for constraint in remaining_constraints:
+                    if self.passing(constraint, n_succ):
+                        passed.add(constraint.cache_key)
                         continue
-
-                    # this might be the creation of a new symbol we need to register the value of
-                    if constraint.op == '__eq__':
-                        new_sym = None
-                        new_val = None
-                        new_val_conc = None
-                        if constraint.args[0].op == 'BVS' and constraint.args[0].cache_key not in self.assignments:
-                            new_sym, new_val = constraint.args
-                        elif constraint.args[1].op == 'BVS' and constraint.args[1].cache_key not in self.assignments:
-                            new_val, new_sym = constraint.args
-                        if new_sym is not None:
-                            if len(succ.successors) != 1:
-                                raise Exception("I was not prepared for this")
-                            new_val_conc = new_val.replace_dict(self.assignments)
-                            if new_val_conc.op != 'BVV':
-                                raise Exception("Couldn't come up with value for new symbol")
-                            self.assignments[new_sym.cache_key] = new_val_conc
-                            passed.add(constraint.cache_key)
-                            continue
-
                     # try evaluating the constraint with our current assignments
                     better_constraint = constraint.replace_dict(self.assignments)
-                    if better_constraint.is_false():
-                        break
-                    if not better_constraint.is_true():
-                        raise Exception("Could not simplify constraint to true/false")
+                    if better_constraint.is_false(): break
+                    assert better_constraint.is_true()
                     passed.add(constraint.cache_key)
                 else:
                     successors.append(succ_state)
 
-            if len(successors) > 1:
-                raise Exception('more successors %d' % len(successors))
             if not successors: return state
+            assert len(successors) == 1
             state, = successors
 
     def make_symbolic_char_args(self, instr, symbolic=True):
