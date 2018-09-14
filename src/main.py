@@ -70,7 +70,7 @@ class Program:
                     if better_constraint.is_false(): break
                     assert better_constraint.is_true()
                     passed.add(constraint.cache_key)
-                else:
+                else: # if no break
                     successors.append(succ_state)
 
             if not successors: return state
@@ -91,8 +91,8 @@ def main(exe, arg):
     prog.set_input(arg)
     res = prog.run()
     print("constraints: %d" % len(res.solver.constraints))
-    for i in res.solver.constraints:
-        print(i)
+    for c in res.solver.constraints:
+        print(c)
     print('done')
 
 if __name__ == '__main__':
