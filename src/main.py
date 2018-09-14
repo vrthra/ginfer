@@ -17,9 +17,9 @@ class Program:
         self.exe = exe
         self.project = angr.Project(exe, load_options={'auto_load_libs': False})
 
-    def set_input(self, arg):
+    def set_input(self, arg, i):
         # generate arg1 from individual characters.
-        self.arg1 = self.make_symbolic_char_args(arg)
+        self.arg1 = self.str_to_ast_except_i(arg, i) #self.make_symbolic_char_args(arg)
         # state:
         #   mode=tracing enables unicorn
         #   simplification=false <-- should z3 simplifiers be invoked
@@ -45,8 +45,20 @@ class Program:
                 # does not seem to affect the number of constraints created
                 remove_options=angr.options.simplification
                 )
-        self.constrain_input_chars(self.initial_state, self.arg1a, arg)
-        self.string_terminate(self.initial_state, self.arg1a, arg)
+        #self.constrain_input_chars(self.initial_state, self.arg1a, arg)
+        #self.string_terminate(self.initial_state, self.arg1a, arg)
+        if i >= 0:
+            self.initial_state.add_constraints(self.sym_i == arg[i])
+
+    def string_to_ast(string):
+        return claripy.Concat(*(claripy.BVV(ord(c), 8) for c in (string + '\0')))
+
+    def str_to_ast_except_i(self, string, i):
+        lst = [claripy.BVV(ord(c), 8) for c in (string + '\0')]
+        if i >= 0:
+            lst[i] = claripy.BVS(Program.ARG_PREFIX, 8)
+            self.sym_i = lst[i]
+        return claripy.Concat(*lst)
 
     def string_terminate(self, state, symarg, inarg):
         state.add_constraints(symarg[len(inarg)] == 0)
@@ -79,14 +91,16 @@ class Program:
         self.arg1a = [self.arg1h[k] for k in arg1k]
         return reduce(lambda x,y: x.concat(y), self.arg1a)
 
-def main(exe, arg):
+def main(exe, arg, i):
     prog = Program(exe)
-    prog.set_input(arg)
+    prog.set_input(arg, int(i))
     res = prog.run()
+    for c in res.solver.constraints:
+        print(c.op, c)
     print("constraints: %d" % len(res.solver.constraints))
     print('done')
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], sys.argv[3])
 
