@@ -32,16 +32,19 @@ class Program:
         self.seen = {}
         self.chars = {}
         for i in range(32):
-            self.chars[i] = '\\%d' % i
+            self.chars[i] = '%d' % i
         for i in range(32, 127):
             self.chars[i] = chr(i)
 
     def int_to_str(self, val):
+        if val < 31:
+            return "%s" % self.chars[val]
         if val < 128:
             return "'%s'" % self.chars[val]
         d = sys.getsizeof(val)
         fmt = '{:0%dx}' % d
-        return str(bytearray.fromhex(fmt.format(val))).replace('\x00', '')
+        return '%d' % d
+        #return repr(str(bytearray.fromhex(fmt.format(val))).replace('\x00', ''))
 
     def get_var_val(self, c):
         val = c.args[0]
@@ -51,6 +54,11 @@ class Program:
             return val, var
         return var, val
 
+    def transform_if(self, c):
+        #solver =self.simgr.active[0].solver
+        assert c.op == 'If'
+        return "(If(%s) then %s else %s)" % (self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2]))
+
     def transform_symbolic(self, c):
         #if not c.is_true() and not c.is_false():
         #    return '<symbolic>'
@@ -58,55 +66,43 @@ class Program:
         if c.op == 'SignExt': return self.transform(c.args[1])
         if c.op == 'ZeroExt': return self.transform(c.args[1])
         if c.op == 'Extract': return "%s[%d:%d]" % (self.transform(c.args[2]), c.args[0], c.args[1])
-        if c.op == '__and__': return "%s && %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__or__': return "%s || %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__xor__': return "%s xor %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__add__': return "%s + %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__sub__': return "%s - %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'And': return "(%s && %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'Or': return "(%s && %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__and__': return "(%s && %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__or__': return "(%s || %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__xor__': return "(%s |x| %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__add__': return "(%s + %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__sub__': return "(%s - %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__mul__': return "(%s * %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__div__': return "(%s / %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
         if c.op == 'Not': return "not(%s)" % self.transform(c.args[0])
-        if c.op == 'If': return "(If(%s) then %s else %s)" % (self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2]))
 
-        if c.op == 'SLE': return "%s <= %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
-        if c.op == 'SGE': return "%s >= %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
-        if c.op == 'SGT': return "%s > %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
-        if c.op == 'SLT': return "%s < %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
-        if c.op == 'ULE': return "%s <= %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
-        if c.op == 'UGE': return "%s >= %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
-        if c.op == 'UGT': return "%s > %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
-        if c.op == 'ULT': return "%s < %s" % (self.transform(c.args[0]), self.transform(c.args[0]))
+        if c.op == '__lt__': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__le__': return "%s <= %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__gt__': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__ge__': return "%s >= %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
 
+        if c.op == 'SLE': return "%s <= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'SGE': return "%s >= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'SGT': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'SLT': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'ULE': return "%s <= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'UGE': return "%s >= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'UGT': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'ULT': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
 
-        if c.op == '__ne__':
-            #if c.depth == 2:
-            #    var, val = self.get_var_val(c)
-            #    assert val.size() == 8
-            #    return "i[%d] != %s" % (self.arg1k8[var.args[0]], "'%s'" % chr(val.args[0]) if val.args[0] != 0 else '0' )
-            #else:
-                return "%s != %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
+        if c.op == 'If': return self.transform_if(c)
 
-        if c.op == '__eq__':
-            #if c.depth == 2:
-            #    var, val = self.get_var_val(c)
-            #    assert val.size() == 8
-            #    return "i[%d] == %s" % (self.arg1k8[var.args[0]], "'%s'" % chr(val.args[0]) if val.args[0] != 0 else '0' )
-            #else:
-                return "%s == %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
+        if c.op == '__ne__': return "%s != %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
+        if c.op == '__eq__': return "%s == %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
 
         if c.op == 'BVS':
             assert c.depth == 1
             if c.size() == 8:
                 assert c.args[0].startswith(Program.ARG_PREFIX)
                 return "i[%d]" % (self.arg1k8[c.args[0]])
-            # check c.size() == 8 for finding if it represents a char
-            # check the arg prefix
-            # a leaf node
             return "<%s>" % c.args[0]
 
-
-        #if c.op == '__eq__':
-        #    return ([self.transform(a) for a in c.args], '__eq__')
-        #if c.op == 'SignExt':
-        #    ([self.transform(a) for a in c.args[1:]], "OP:%s" % c.op)
         return ([self.transform(a) for a in c.args], "OP:%s" % c.op)
 
     # idea: we need only variables that relate to input bytes
@@ -121,6 +117,7 @@ class Program:
 
     def run(self):
         while len(self.simgr.active) >= 1:
+            # sys.stdout.write('_')
             assert len(self.simgr.active) == 1
             do_print = False
             for c in self.simgr.active[0].solver.constraints:
@@ -128,10 +125,10 @@ class Program:
                     continue
                 self.seen[c.cache_key] = True
                 do_print = True
-                print self.initial_state.solver.eval(c), "\t", self.transform(c)
+                assert self.simgr.active[0].solver.eval(c)
+                print self.transform(c)
             self.simgr.step()
-            if do_print:
-                print
+            #if do_print: print
             sys.stdout.flush()
 
     def string_terminate(self, state, symarg, inarg):
@@ -156,9 +153,10 @@ def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
     prog.run()
-    #print "------"
-    #for i in prog.simgr.deadended[0].solver.constraints:
-    #    print(i.op, i.args)
+    print "x"*80
+    for c in prog.simgr.deadended[0].solver.constraints:
+        assert prog.simgr.deadended[0].solver.eval(c)
+        print prog.transform(c)
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
