@@ -4,71 +4,69 @@ import time
 import angr
 import random
 import claripy
+import tracer
 
 
 class Program:
     ARG_PREFIX = 'sym_arg'
     def __init__(self, exe):
-        '''
-        The program loads the binary for analysis. Using {auto_load_libs: false}
-        tells angr to use an unconstrained value when a c-lib is called
-        https://docs.angr.io/docs/loading.html#symbolic-function-summaries
-        '''
         self.exe = exe
-        self.project = angr.Project(exe, load_options={'auto_load_libs': False})
+        self.project = angr.Project(exe, load_options={'auto_load_libs': False},
+                main_opts={'custom_base_addr': 0x4000000000},
+                )
 
     def set_input(self, arg):
-        # generate arg1 from individual characters.
         self.arg1 = self.make_symbolic_char_args(arg)
-        # state:
-        #   mode=tracing enables unicorn
-        #   simplification=false <-- should z3 simplifiers be invoked
-        # s.options.add(angr.options..)
-        # angr.options.CONCRETIZE
-        # angr.options.SIMPLIFY_CONSTRAINTS
-        # angr.options.SIMPLIFY_EXIT_GUARD
-        # angr.options.SIMPLIFY_EXIT_STATE
-        # angr.options.SIMPLIFY_EXIT_TARGET
-        # angr.options.SIMPLIFY_EXPRS
-        # angr.options.SIMPLIFY_MEMORY_READS
-        # angr.options.SIMPLIFY_MEMORY_WRITES
-        # angr.options.SIMPLIFY_REGISTER_READS
-        # angr.options.SIMPLIFY_REGISTER_WRITES
-        # angr.options.SIMPLIFY_RETS
-        # angr.options.TRACK_SOLVER_VARIABLES
-        # angr.options.UNICORN
-
         self.initial_state = self.project.factory.entry_state(
                 args=[self.exe, self.arg1],
-                # does not seem to startup the unicorn engine either
-                add_options=angr.options.unicorn,
-                # does not seem to affect the number of constraints created
                 remove_options=angr.options.simplification
                 )
         self.constrain_input_chars(self.initial_state, self.arg1a, arg)
         self.string_terminate(self.initial_state, self.arg1a, arg)
+        self.simgr = self.project.factory.simgr(self.initial_state, mode='tracing')
+        self.runner = tracer.QEMURunner(binary=self.exe, input='', project=self.project, argv=[self.exe, arg])
+        self.simgr.use_technique(angr.exploration_techniques.Tracer(trace=self.runner.trace))
+        self.seen = {}
 
-    def string_terminate(self, state, symarg, inarg):
-        state.add_constraints(symarg[len(inarg)] == 0)
+    def int_to_str(self, val):
+        return str(bytearray.fromhex('{:0100x}'.format(val)))
 
-    def constrain_input_chars(self, state, symarg, sarg):
-        constraints = []
-        for i,a in enumerate(sarg):
-            state.add_constraints(symarg[i] == a)
+    # idea: we need only variables that relate to input bytes
+    # wipe out any symbolics
+    def transform(self, c):
+        if c.op == 'BVV':
+            val, bits = c.args
+            for i in range(30):
+                if val == i: return '\%d' % i
+            return self.int_to_str(val)
+
+        if c.op == 'BVS':
+            return c.args[0]
+        if c.op == '__eq__':
+            return ([self.transform(a) for a in c.args], '__eq__')
+        if c.op == 'SignExt':
+            ([self.transform(a) for a in c.args[1:]], "OP:%s" % c.op)
+        return ([self.transform(a) for a in c.args], "OP:%s" % c.op)
 
     def run(self):
-        state = self.initial_state
-        while True:
-            succ = state.step()
-            if len(succ.successors) > 1:
-                raise Exception('more successors %d' % len(succ.successors))
-            if not succ.successors: return state
-            state, = succ.successors
+        while len(self.simgr.active) >= 1:
+            assert len(self.simgr.active) == 1
+            for c in self.simgr.active[0].solver.constraints:
+                if c.cache_key in self.seen:
+                    continue
+                self.seen[c.cache_key] = True
+                print self.transform(c)
+            self.simgr.step()
+            print
+
+    def string_terminate(self, state, symarg, inarg):
+        self.initial_state.preconstrainer.preconstrain(0, symarg[len(inarg)])
+
+    def constrain_input_chars(self, state, symarg, sarg):
+        for i,a in enumerate(sarg):
+            self.initial_state.preconstrainer.preconstrain(a, symarg[i])
 
     def make_symbolic_char_args(self, instr, symbolic=True):
-        """
-        input contains the args
-        """
         if not symbolic: return instr
         input_len = len(instr)
         largs = range(0, input_len+1)
@@ -82,9 +80,9 @@ class Program:
 def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
-    res = prog.run()
-    print("constraints: %d" % len(res.solver.constraints))
-    print('done')
+    prog.run()
+    for i in prog.simgr.deadended[0].solver.constraints:
+        print(i.op, i.args)
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
