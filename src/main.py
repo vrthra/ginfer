@@ -1,3 +1,7 @@
+import logging
+logging.getLogger('angr').setLevel(logging.CRITICAL)
+logging.getLogger('tracer.qemu_runner').setLevel(logging.CRITICAL)
+
 import sys
 import os
 import time
@@ -22,6 +26,7 @@ class Program:
         self.arg1 = self.make_symbolic_char_args(arg)
         self.initial_state = self.project.factory.entry_state(
                 args=[self.exe, self.arg1],
+                add_options=angr.options.unicorn,
                 remove_options=angr.options.simplification
                 )
         self.constrain_input_chars(self.initial_state, self.arg1a, arg)
@@ -104,7 +109,7 @@ class Program:
             if c.size() == 8:
                 assert c.args[0].startswith(Program.ARG_PREFIX)
                 return "i[%d]" % (self.arg1k8[c.args[0]])
-            return "<%s>" % c.args[0]
+            return "<%s>" % c.args[0][0:-3] if c.args[0].endswith('_64') else c.args[0]
 
         return ([self.transform(a) for a in c.args], "OP:%s" % c.op)
 
