@@ -77,6 +77,9 @@ class Program:
         if c.op == '__div__': return "(%s / %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
         if c.op == 'Not': return "not(%s)" % self.transform(c.args[0])
 
+        if c.op == '__lshift__': return "%s << %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__rshift__': return "%s >> %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+
         if c.op == '__lt__': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
         if c.op == '__le__': return "%s <= %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
         if c.op == '__gt__': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
