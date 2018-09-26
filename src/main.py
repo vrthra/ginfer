@@ -11,6 +11,7 @@ import random
 import claripy
 import tracer
 
+
 def is_concrete(val):
     return val.concrete
 
@@ -78,7 +79,7 @@ class Program:
             return v
         # signext is a bit more complicated than zero ext for negative values
         if c.op == 'SignExt':
-            assert c.args[0] == 32
+            #assert c.args[0] == 32
             v.update({
                     'fmt':"%s",
                     'args':(self.transform(c.args[1], v),),
@@ -270,7 +271,7 @@ class Program:
             assert c.depth == 1
             if c.size() == 8:
                 assert c.args[0].startswith(Program.ARG_PREFIX)
-                self.vars.append({self.arg1k8[c.args[0]]:self.what_was_compared(p)})
+                self.vars.append({'i':self.arg1k8[c.args[0]], 'p':p, 'c':c})
                 v.update({
                         'fmt':"i[%d]",
                         'args':(self.arg1k8[c.args[0]],),
@@ -296,11 +297,19 @@ class Program:
         else:
             return self.transform_symbolic(c, parent)
 
-    def what_was_compared(self, p):
-        return str(p)
+    def get_bool_op(self, p):
+        if p['op'] in ['__eq__', '__ne__',
+                       '__le__', '__lt__',
+                       '__ge__', '__gt__']:
+            return p
+        return self.get_bool_op(p['parent'])
+
+    def extract(self, v):
+        val = self.get_bool_op(v['p'])
+        return to_str(val)
+
 
     def show_initial_constraints(self):
-        import pudb; pudb.set_trace()
         assert len(self.simgr.active) == 1
         for c in self.simgr.active[0].solver.constraints:
             if c.cache_key in self.seen: continue
@@ -309,7 +318,8 @@ class Program:
             assert self.simgr.active[0].solver.eval(c)
             v = self.transform(c, {})
             if self.vars:
-                print to_str(v), "\n", ">>\t", self.vars
+                print to_str(v), "\n", ">>\t", [self.extract(v) for v in self.vars]
+            self.vars = []
         print
 
     def run(self):
@@ -325,7 +335,8 @@ class Program:
                 assert self.simgr.active[0].solver.eval(c)
 
                 v = self.transform(c)
-                if self.vars: print to_str(v), "\n", ">>\t", self.vars
+                if self.vars:
+                    print to_str(v), "\n", ">>\t", [self.extract(v) for v in self.vars]
                 self.vars = []
 
             self.simgr.step()
@@ -354,13 +365,12 @@ def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
     prog.show_initial_constraints()
-    sys.exit(0)
     prog.run()
     print
     for c in prog.simgr.deadended[0].solver.constraints:
         assert prog.simgr.deadended[0].solver.eval(c)
         v = prog.transform(c)
-        if prog.vars: print to_str(v), "\n", ">>\t", prog.vars
+        if prog.vars: print to_str(v), "\n", ">>\t", [prog.extract(v) for v in prog.vars]
         prog.vars = []
 
 if __name__ == '__main__':
