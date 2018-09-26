@@ -117,6 +117,16 @@ class Program:
         else:
             return self.transform_symbolic(c)
 
+    def show_initial_constraints(self):
+        assert len(self.simgr.active) == 1
+        for c in self.simgr.active[0].solver.constraints:
+            if c.cache_key in self.seen: continue
+            self.seen[c.cache_key] = True
+            do_print = True
+            assert self.simgr.active[0].solver.eval(c)
+            print self.transform(c)
+        print
+
     def run(self):
         while len(self.simgr.active) >= 1:
             # sys.stdout.write('_')
@@ -154,8 +164,9 @@ class Program:
 def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
+    prog.show_initial_constraints()
     prog.run()
-    print "x"*80
+    print
     for c in prog.simgr.deadended[0].solver.constraints:
         assert prog.simgr.deadended[0].solver.eval(c)
         print prog.transform(c)
