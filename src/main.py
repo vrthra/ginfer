@@ -59,15 +59,8 @@ class Program:
             return val, var
         return var, val
 
-    def transform_if(self, c):
-        #solver =self.simgr.active[0].solver
-        assert c.op == 'If'
-        return "(If(%s) then %s else %s)" % (self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2]))
-
     def transform_symbolic(self, c):
-        #if not c.is_true() and not c.is_false():
-        #    return '<symbolic>'
-        if c.op == 'LShR': return "%s << %d" % self.transform(c.args[0], c.args[1])
+        if c.op == 'LShR': return "%s << %d" % (self.transform(c.args[0]), c.args[1])
         if c.op == 'SignExt': return self.transform(c.args[1])
         if c.op == 'ZeroExt': return self.transform(c.args[1])
         if c.op == 'Extract': return "%s[%d:%d]" % (self.transform(c.args[2]), c.args[0], c.args[1])
@@ -99,7 +92,8 @@ class Program:
         if c.op == 'UGT': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
         if c.op == 'ULT': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
 
-        if c.op == 'If': return self.transform_if(c)
+        if c.op == 'If': return
+            return "(If(%s) then %s else %s)" % (self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2]))
 
         if c.op == '__ne__': return "%s != %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
         if c.op == '__eq__': return "%s == %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
