@@ -69,220 +69,222 @@ class Program:
         return var, val
 
     def transform_symbolic(self, c, p=None):
+        v = {'op':c.op, 'parent':p,'current':c}
         if c.op == 'LShR':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s << %d",
-                    'args':[self.transform(c.args[0], c), c.args[1]],
-                    'parent':p,
-                    'current':c}
+                    'args':[self.transform(c.args[0], v), c.args[1]],
+                    })
+            return v
         # signext is a bit more complicated than zero ext for negative values
         if c.op == 'SignExt':
             assert c.args[0] == 32
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s",
-                    'args':(self.transform(c.args[1]),),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[1], v),),
+                    })
+            return v
         if c.op == 'ZeroExt':
             #assert c.args[0] == 32
             # zero should only padd zeros to left. Hence it hould be a no-op
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s",
-                    'args':(self.transform(c.args[1]),),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[1], v),),
+                    })
+            return v
         if c.op == 'Extract':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s[%d:%d]",
-                    'args':(self.transform(c.args[2]), c.args[0], c.args[1]),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[2], v), c.args[0], c.args[1]),
+                    })
+            return v
         if c.op == 'And':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s && %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'Or':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s || %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__and__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s && %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__or__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s || %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__xor__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s (+) %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__add__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s + %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__sub__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s - %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__mul__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s * %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__div__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(%s / %s)",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'Not':
-            return {'op':c.op,
+            v.update({
                     'fmt':"not(%s)",
-                    'args':(self.transform(c.args[0]),),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v),),
+                    })
+            return v
 
         if c.op == '__lshift__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s << %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__rshift__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s >> %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
 
         if c.op == '__lt__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s < %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__le__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s <= %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__gt__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s > %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__ge__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s >= %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
 
         if c.op == 'SLE':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s <= %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'SGE':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s >= %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'SGT':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s > %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'SLT':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s < %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'ULE':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s <= %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'UGE':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s >= %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'UGT':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s > %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == 'ULT':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s < %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
 
         if c.op == 'If':
-            return {'op':c.op,
+            v.update({
                     'fmt':"(If %s  then %s else %s)",
-                    'args':(self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v),self.transform(c.args[1], v),self.transform(c.args[2], v)),
+                    })
+            return v
 
         if c.op == '__ne__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s != %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
         if c.op == '__eq__':
-            return {'op':c.op,
+            v.update({
                     'fmt':"%s == %s",
-                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
-                    'parent':p,
-                    'current':c}
+                    'args':(self.transform(c.args[0], v), self.transform(c.args[1], v)),
+                    })
+            return v
 
         if c.op == 'BVS':
             assert c.depth == 1
             if c.size() == 8:
                 assert c.args[0].startswith(Program.ARG_PREFIX)
-                self.vars.append(self.arg1k8[c.args[0]])
-                return {'op':c.op,
+                self.vars.append({self.arg1k8[c.args[0]]:self.what_was_compared(p)})
+                v.update({
                         'fmt':"i[%d]",
                         'args':(self.arg1k8[c.args[0]],),
-                        'parent':p,
-                        'current':c}
-            return {'op':c.op,
-                    'fmt':"<%s>",
-                    'args':(c.args[0][0:-3] if c.args[0].endswith('_64') else c.args[0],),
-                    'parent':p,
-                    'current':c}
+                        })
+                return v
+            else:
+                v.update({
+                        'fmt':"<%s>",
+                        'args':(c.args[0][0:-3] if c.args[0].endswith('_64') else c.args[0],),
+                        })
+                return v
 
+        print c.op
         assert False
-        return ([self.transform(a) for a in c.args], "OP:%s" % c.op)
 
     # idea: we need only variables that relate to input bytes
     # wipe out any symbolics
@@ -294,14 +296,20 @@ class Program:
         else:
             return self.transform_symbolic(c, parent)
 
+    def what_was_compared(self, p):
+        return str(p)
+
     def show_initial_constraints(self):
+        import pudb; pudb.set_trace()
         assert len(self.simgr.active) == 1
         for c in self.simgr.active[0].solver.constraints:
             if c.cache_key in self.seen: continue
             self.seen[c.cache_key] = True
             do_print = True
             assert self.simgr.active[0].solver.eval(c)
-            print to_str(self.transform(c))
+            v = self.transform(c, {})
+            if self.vars:
+                print to_str(v), "\n", ">>\t", self.vars
         print
 
     def run(self):
@@ -346,6 +354,7 @@ def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
     prog.show_initial_constraints()
+    sys.exit(0)
     prog.run()
     print
     for c in prog.simgr.deadended[0].solver.constraints:
