@@ -14,6 +14,13 @@ import tracer
 def is_concrete(val):
     return val.concrete
 
+def to_str(root):
+    if not isinstance(root, dict):
+        return root
+    myargs = []
+    for i in root['args']:
+        myargs.append(to_str(i))
+    return root['fmt'] % tuple(myargs)
 
 class Program:
     ARG_PREFIX = 'sym_arg'
@@ -61,64 +68,231 @@ class Program:
             return val, var
         return var, val
 
-    def transform_symbolic(self, c):
-        if c.op == 'LShR': return "%s << %d" % (self.transform(c.args[0]), c.args[1])
-        if c.op == 'SignExt': return self.transform(c.args[1])
-        if c.op == 'ZeroExt': return self.transform(c.args[1])
-        if c.op == 'Extract': return "%s[%d:%d]" % (self.transform(c.args[2]), c.args[0], c.args[1])
-        if c.op == 'And': return "(%s && %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'Or': return "(%s && %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__and__': return "(%s && %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__or__': return "(%s || %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__xor__': return "(%s |x| %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__add__': return "(%s + %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__sub__': return "(%s - %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__mul__': return "(%s * %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__div__': return "(%s / %s)" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'Not': return "not(%s)" % self.transform(c.args[0])
+    def transform_symbolic(self, c, p=None):
+        if c.op == 'LShR':
+            return {'op':c.op,
+                    'fmt':"%s << %d",
+                    'args':[self.transform(c.args[0], c), c.args[1]],
+                    'parent':p,
+                    'current':c}
+        # signext is a bit more complicated than zero ext for negative values
+        if c.op == 'SignExt':
+            assert c.args[0] == 32
+            return {'op':c.op,
+                    'fmt':"%s",
+                    'args':(self.transform(c.args[1]),),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'ZeroExt':
+            #assert c.args[0] == 32
+            # zero should only padd zeros to left. Hence it hould be a no-op
+            return {'op':c.op,
+                    'fmt':"%s",
+                    'args':(self.transform(c.args[1]),),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'Extract':
+            return {'op':c.op,
+                    'fmt':"%s[%d:%d]",
+                    'args':(self.transform(c.args[2]), c.args[0], c.args[1]),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'And':
+            return {'op':c.op,
+                    'fmt':"(%s && %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'Or':
+            return {'op':c.op,
+                    'fmt':"(%s || %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__and__':
+            return {'op':c.op,
+                    'fmt':"(%s && %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__or__':
+            return {'op':c.op,
+                    'fmt':"(%s || %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__xor__':
+            return {'op':c.op,
+                    'fmt':"(%s (+) %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__add__':
+            return {'op':c.op,
+                    'fmt':"(%s + %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__sub__':
+            return {'op':c.op,
+                    'fmt':"(%s - %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__mul__':
+            return {'op':c.op,
+                    'fmt':"(%s * %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__div__':
+            return {'op':c.op,
+                    'fmt':"(%s / %s)",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'Not':
+            return {'op':c.op,
+                    'fmt':"not(%s)",
+                    'args':(self.transform(c.args[0]),),
+                    'parent':p,
+                    'current':c}
 
-        if c.op == '__lshift__': return "%s << %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__rshift__': return "%s >> %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__lshift__':
+            return {'op':c.op,
+                    'fmt':"%s << %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__rshift__':
+            return {'op':c.op,
+                    'fmt':"%s >> %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
 
-        if c.op == '__lt__': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__le__': return "%s <= %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__gt__': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == '__ge__': return "%s >= %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == '__lt__':
+            return {'op':c.op,
+                    'fmt':"%s < %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__le__':
+            return {'op':c.op,
+                    'fmt':"%s <= %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__gt__':
+            return {'op':c.op,
+                    'fmt':"%s > %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__ge__':
+            return {'op':c.op,
+                    'fmt':"%s >= %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
 
-        if c.op == 'SLE': return "%s <= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'SGE': return "%s >= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'SGT': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'SLT': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'ULE': return "%s <= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'UGE': return "%s >= %s" % (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'UGT': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
-        if c.op == 'ULT': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
+        if c.op == 'SLE':
+            return {'op':c.op,
+                    'fmt':"%s <= %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'SGE':
+            return {'op':c.op,
+                    'fmt':"%s >= %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'SGT':
+            return {'op':c.op,
+                    'fmt':"%s > %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'SLT':
+            return {'op':c.op,
+                    'fmt':"%s < %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'ULE':
+            return {'op':c.op,
+                    'fmt':"%s <= %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'UGE':
+            return {'op':c.op,
+                    'fmt':"%s >= %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'UGT':
+            return {'op':c.op,
+                    'fmt':"%s > %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == 'ULT':
+            return {'op':c.op,
+                    'fmt':"%s < %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
 
         if c.op == 'If':
-            return "(If(%s) then %s else %s)" % (self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2]))
+            return {'op':c.op,
+                    'fmt':"(If %s  then %s else %s)",
+                    'args':(self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2])),
+                    'parent':p,
+                    'current':c}
 
-        if c.op == '__ne__': return "%s != %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
-        if c.op == '__eq__': return "%s == %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
+        if c.op == '__ne__':
+            return {'op':c.op,
+                    'fmt':"%s != %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
+        if c.op == '__eq__':
+            return {'op':c.op,
+                    'fmt':"%s == %s",
+                    'args':(self.transform(c.args[0]), self.transform(c.args[1])),
+                    'parent':p,
+                    'current':c}
 
         if c.op == 'BVS':
             assert c.depth == 1
             if c.size() == 8:
                 assert c.args[0].startswith(Program.ARG_PREFIX)
                 self.vars.append(self.arg1k8[c.args[0]])
-                return "i[%d]" % (self.arg1k8[c.args[0]])
-            return "<%s>" % c.args[0][0:-3] if c.args[0].endswith('_64') else c.args[0]
+                return {'op':c.op,
+                        'fmt':"i[%d]",
+                        'args':(self.arg1k8[c.args[0]],),
+                        'parent':p,
+                        'current':c}
+            return {'op':c.op,
+                    'fmt':"<%s>",
+                    'args':(c.args[0][0:-3] if c.args[0].endswith('_64') else c.args[0],),
+                    'parent':p,
+                    'current':c}
 
+        assert False
         return ([self.transform(a) for a in c.args], "OP:%s" % c.op)
 
     # idea: we need only variables that relate to input bytes
     # wipe out any symbolics
-    def transform(self, c):
+    def transform(self, c, parent=None):
         if is_concrete(c):
             assert c.op == 'BVV'
             val, bits = c.args
             return self.int_to_str(val)
         else:
-            return self.transform_symbolic(c)
+            return self.transform_symbolic(c, parent)
 
     def show_initial_constraints(self):
         assert len(self.simgr.active) == 1
@@ -127,7 +301,7 @@ class Program:
             self.seen[c.cache_key] = True
             do_print = True
             assert self.simgr.active[0].solver.eval(c)
-            print self.transform(c)
+            print to_str(self.transform(c))
         print
 
     def run(self):
@@ -143,7 +317,7 @@ class Program:
                 assert self.simgr.active[0].solver.eval(c)
 
                 v = self.transform(c)
-                if self.vars: print v, "\n", ">>\t", self.vars
+                if self.vars: print to_str(v), "\n", ">>\t", self.vars
                 self.vars = []
 
             self.simgr.step()
@@ -177,7 +351,7 @@ def main(exe, arg):
     for c in prog.simgr.deadended[0].solver.constraints:
         assert prog.simgr.deadended[0].solver.eval(c)
         v = prog.transform(c)
-        if prog.vars: print v, "\n", ">>\t", prog.vars
+        if prog.vars: print to_str(v), "\n", ">>\t", prog.vars
         prog.vars = []
 
 if __name__ == '__main__':
