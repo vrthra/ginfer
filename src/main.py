@@ -92,7 +92,7 @@ class Program:
         if c.op == 'UGT': return "%s > %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
         if c.op == 'ULT': return "%s < %s" %  (self.transform(c.args[0]), self.transform(c.args[1]))
 
-        if c.op == 'If': return
+        if c.op == 'If':
             return "(If(%s) then %s else %s)" % (self.transform(c.args[0]),self.transform(c.args[1]),self.transform(c.args[2]))
 
         if c.op == '__ne__': return "%s != %s" % (self.transform(c.args[0]),self.transform(c.args[1]))
