@@ -3,6 +3,7 @@ logging.getLogger('angr').setLevel(logging.CRITICAL)
 logging.getLogger('tracer.qemu_runner').setLevel(logging.CRITICAL)
 
 import sys
+import z3
 import os
 import time
 import angr
@@ -21,6 +22,7 @@ class Program:
         self.project = angr.Project(exe, load_options={'auto_load_libs': False},
                 main_opts={'custom_base_addr': 0x4000000000},
                 )
+        self.vars = []
 
     def set_input(self, arg):
         self.arg1 = self.make_symbolic_char_args(arg)
@@ -102,6 +104,7 @@ class Program:
             assert c.depth == 1
             if c.size() == 8:
                 assert c.args[0].startswith(Program.ARG_PREFIX)
+                self.vars.append(self.arg1k8[c.args[0]])
                 return "i[%d]" % (self.arg1k8[c.args[0]])
             return "<%s>" % c.args[0][0:-3] if c.args[0].endswith('_64') else c.args[0]
 
@@ -138,7 +141,11 @@ class Program:
                 self.seen[c.cache_key] = True
                 do_print = True
                 assert self.simgr.active[0].solver.eval(c)
-                print self.transform(c)
+
+                v = self.transform(c)
+                if self.vars: print v, "\n", ">>\t", self.vars
+                self.vars = []
+
             self.simgr.step()
             #if do_print: print
             sys.stdout.flush()
@@ -169,7 +176,9 @@ def main(exe, arg):
     print
     for c in prog.simgr.deadended[0].solver.constraints:
         assert prog.simgr.deadended[0].solver.eval(c)
-        print prog.transform(c)
+        v = prog.transform(c)
+        if prog.vars: print v, "\n", ">>\t", prog.vars
+        prog.vars = []
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
