@@ -98,7 +98,7 @@ class Program:
         cmax,cmin = self.get_max_min(val, idx)
         #lhs = val.args[0]
         #rhs = val.args[1]
-        return to_str(val), idx, cmax, cmin
+        return to_str(val), idx, int(cmax), int(cmin)
 
 
     def show_initial_constraints(self):
