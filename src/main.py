@@ -1,3 +1,5 @@
+import pudb
+breakpoint = pudb.set_trace
 import logging
 logging.getLogger('angr').setLevel(logging.CRITICAL)
 logging.getLogger('tracer.qemu_runner').setLevel(logging.CRITICAL)
@@ -73,9 +75,19 @@ class Program:
             return p
         return self.get_bool_op(p['parent'])
 
+    def get_max_min(self, val, idx):
+        solver = claripy.Solver()
+        solver.add(val)
+        sym = self.arg1a[idx]
+        return (solver.max(sym), solver.min(sym))
+
     def extract(self, v):
-        val = self.get_bool_op(v['p'])
-        return to_str(val)
+        idx = v['i']
+        val = self.get_bool_op(v['p'])['current']
+        cmax,cmin = self.get_max_min(val, idx)
+        #lhs = val.args[0]
+        #rhs = val.args[1]
+        return to_str(val), idx, cmax, cmin
 
 
     def show_initial_constraints(self):
@@ -87,7 +99,10 @@ class Program:
             assert self.simgr.active[0].solver.eval(c)
             v = self.transform(c, {})
             if self.vars:
-                print to_str(v), "\n", ">>\t", [self.extract(v) for v in self.vars]
+                print to_str(v)
+                for v in self.vars:
+                    s, idx, cmax, cmin = self.extract(v)
+                    print ">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax)
             self.vars = []
         print
 
@@ -105,7 +120,10 @@ class Program:
 
                 v = self.transform(c)
                 if self.vars:
-                    print to_str(v), "\n", ">>\t", [self.extract(v) for v in self.vars]
+                    print to_str(v)
+                for v in self.vars:
+                    s, idx, cmax, cmin = self.extract(v)
+                    print ">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax)
                 self.vars = []
 
             self.simgr.step()
@@ -139,7 +157,10 @@ def main(exe, arg):
     for c in prog.simgr.deadended[0].solver.constraints:
         assert prog.simgr.deadended[0].solver.eval(c)
         v = prog.transform(c)
-        if prog.vars: print to_str(v), "\n", ">>\t", [prog.extract(v) for v in prog.vars]
+        if prog.vars: print to_str(v)
+        for v in prog.vars:
+            s, idx, cmax, cmin = prog.extract(v)
+            print ">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax)
         prog.vars = []
 
 if __name__ == '__main__':
