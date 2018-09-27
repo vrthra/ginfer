@@ -14,6 +14,15 @@ import claripy
 import tracer
 import pimpl
 
+def log(v): pass
+def info(v=None):
+    return
+    if v:
+        print v
+    else:
+        print
+
+
 
 def is_concrete(val):
     return val.concrete
@@ -35,6 +44,7 @@ class Program:
                 )
         self.vars = []
         self.pimpl = pimpl.PImpl(self)
+        self.comparisons_with = {}
 
     def set_input(self, arg):
         self.arg1 = self.make_symbolic_char_args(arg)
@@ -49,6 +59,7 @@ class Program:
         self.runner = tracer.QEMURunner(binary=self.exe, input='', project=self.project, argv=[self.exe, arg])
         self.simgr.use_technique(angr.exploration_techniques.Tracer(trace=self.runner.trace))
         self.seen = {}
+        for i in range(len(arg)+1): self.comparisons_with[i] = []
 
     def get_var_val(self, c):
         val = c.args[0]
@@ -95,39 +106,48 @@ class Program:
         for c in self.simgr.active[0].solver.constraints:
             if c.cache_key in self.seen: continue
             self.seen[c.cache_key] = True
-            do_print = True
             assert self.simgr.active[0].solver.eval(c)
             v = self.transform(c, {})
             if self.vars:
-                print to_str(v)
+                info(to_str(v))
                 for v in self.vars:
                     s, idx, cmax, cmin = self.extract(v)
-                    print ">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax)
+                    self.comparisons_with[idx].append((cmin, cmax))
+                    log(">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax))
             self.vars = []
-        print
+    def show_final_constraints(self):
+        for c in self.simgr.deadended[0].solver.constraints:
+            assert self.simgr.deadended[0].solver.eval(c)
+            v = self.transform(c)
+            if self.vars: info(to_str(v))
+            for v in self.vars:
+                s, idx, cmax, cmin = self.extract(v)
+                self.comparisons_with[idx].append((cmin, cmax))
+                log(">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax))
+            self.vars = []
+
+    def show_constraints(self):
+        for c in self.simgr.active[0].solver.constraints:
+            if c.cache_key in self.seen:
+                continue
+            self.seen[c.cache_key] = True
+            assert self.simgr.active[0].solver.eval(c)
+
+            v = self.transform(c)
+            if self.vars: info(to_str(v))
+            for v in self.vars:
+                s, idx, cmax, cmin = self.extract(v)
+                self.comparisons_with[idx].append((cmin, cmax))
+                log(">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax))
+            self.vars = []
 
     def run(self):
         while len(self.simgr.active) >= 1:
             # sys.stdout.write('_')
             assert len(self.simgr.active) == 1
-            do_print = False
-            for c in self.simgr.active[0].solver.constraints:
-                if c.cache_key in self.seen:
-                    continue
-                self.seen[c.cache_key] = True
-                do_print = True
-                assert self.simgr.active[0].solver.eval(c)
-
-                v = self.transform(c)
-                if self.vars:
-                    print to_str(v)
-                for v in self.vars:
-                    s, idx, cmax, cmin = self.extract(v)
-                    print ">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax)
-                self.vars = []
+            self.show_constraints()
 
             self.simgr.step()
-            #if do_print: print
             sys.stdout.flush()
 
     def string_terminate(self, state, symarg, inarg):
@@ -152,16 +172,13 @@ def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
     prog.show_initial_constraints()
+    info()
     prog.run()
-    print
-    for c in prog.simgr.deadended[0].solver.constraints:
-        assert prog.simgr.deadended[0].solver.eval(c)
-        v = prog.transform(c)
-        if prog.vars: print to_str(v)
-        for v in prog.vars:
-            s, idx, cmax, cmin = prog.extract(v)
-            print ">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax)
-        prog.vars = []
+    info()
+    prog.show_final_constraints()
+    info()
+    for k in sorted(prog.comparisons_with.keys()):
+        print k, prog.comparisons_with[k]
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
