@@ -298,6 +298,11 @@ class Program:
             return self.transform_symbolic(c, parent)
 
     def get_bool_op(self, p):
+        # things like And, Or etc require bool operands
+        # hence they are above this level. These are
+        # the operators that makr the transition from
+        # arithmetic to bool so that we can evaluate their
+        # arguments in pieces.
         if p['op'] in ['__eq__', '__ne__',
                        '__le__', '__lt__',
                        '__ge__', '__gt__']:
