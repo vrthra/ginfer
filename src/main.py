@@ -14,15 +14,18 @@ import claripy
 import tracer
 import pimpl
 
-def log(v): pass
+def log(v):
+    print v
+    sys.stdout.flush()
 def info(v=None):
-    return
     if v:
         print v
     else:
         print
+    sys.stdout.flush()
 
-
+def extra_cautious(f):
+    assert f()
 
 def is_concrete(val):
     return val.concrete
@@ -43,6 +46,9 @@ class Program:
                 main_opts={'custom_base_addr': 0x4000000000},
                 )
         self.vars = []
+        self.initial_constraints = []
+        self.running_constraints = []
+        self.final_constraints = []
         self.pimpl = pimpl.PImpl(self)
         self.comparisons_with = {}
 
@@ -59,7 +65,10 @@ class Program:
         self.runner = tracer.QEMURunner(binary=self.exe, input='', project=self.project, argv=[self.exe, arg])
         self.simgr.use_technique(angr.exploration_techniques.Tracer(trace=self.runner.trace))
         self.seen = {}
-        for i in range(len(arg)+1): self.comparisons_with[i] = []
+        self.reset_comparisons()
+
+    def reset_comparisons(self):
+            for i in range(len(self.arg1a)+1): self.comparisons_with[i] = []
 
     def get_var_val(self, c):
         val = c.args[0]
@@ -100,25 +109,16 @@ class Program:
         #rhs = val.args[1]
         return to_str(val), idx, int(cmax), int(cmin)
 
-
-    def show_initial_constraints(self):
+    def save_initial_constraints(self):
         assert len(self.simgr.active) == 1
         for c in self.simgr.active[0].solver.constraints:
             if c.cache_key in self.seen: continue
             self.seen[c.cache_key] = True
-            assert self.simgr.active[0].solver.eval(c)
+            self.initial_constraints.append(c)
+
+    def show_constraints(self, constraints):
+        for c in constraints:
             v = self.transform(c, {})
-            if self.vars:
-                info(to_str(v))
-                for v in self.vars:
-                    s, idx, cmax, cmin = self.extract(v)
-                    self.comparisons_with[idx].append((cmin, cmax))
-                    log(">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax))
-            self.vars = []
-    def show_final_constraints(self):
-        for c in self.simgr.deadended[0].solver.constraints:
-            assert self.simgr.deadended[0].solver.eval(c)
-            v = self.transform(c)
             if self.vars: info(to_str(v))
             for v in self.vars:
                 s, idx, cmax, cmin = self.extract(v)
@@ -126,14 +126,18 @@ class Program:
                 log(">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax))
             self.vars = []
 
-    def show_constraints(self):
+    def save_final_constraints(self):
+        for c in self.simgr.deadended[0].solver.constraints:
+            assert self.simgr.deadended[0].solver.eval(c)
+            self.final_constraints.append(c)
+
+    def save_constraints(self):
         for c in self.simgr.active[0].solver.constraints:
             if c.cache_key in self.seen:
                 continue
             self.seen[c.cache_key] = True
-            assert self.simgr.active[0].solver.eval(c)
-
-            v = self.transform(c)
+            extra_cautious(lambda: self.simgr.active[0].solver.eval(c))
+            self.running_constraints.append(c)
             if self.vars: info(to_str(v))
             for v in self.vars:
                 s, idx, cmax, cmin = self.extract(v)
@@ -145,8 +149,7 @@ class Program:
         while len(self.simgr.active) >= 1:
             # sys.stdout.write('_')
             assert len(self.simgr.active) == 1
-            self.show_constraints()
-
+            self.save_constraints()
             self.simgr.step()
             sys.stdout.flush()
 
@@ -171,12 +174,16 @@ class Program:
 def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
-    prog.show_initial_constraints()
-    info()
+    prog.save_initial_constraints()
+    #prog.reset_comparisons()
+    #info()
     prog.run()
-    info()
-    prog.show_final_constraints()
-    info()
+    prog.save_final_constraints()
+    #info()
+    #prog.reset_comparisons()
+    #prog.show_final_constraints()
+    print 'done running'
+    prog.show_constraints(prog.initial_constraints)
     for k in sorted(prog.comparisons_with.keys()):
         print k, prog.comparisons_with[k]
 
