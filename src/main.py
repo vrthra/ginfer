@@ -14,56 +14,64 @@ import claripy
 import tracer
 import pimpl
 
-def log(v): pass
-def info(v=None):
-    return
+def fprint(v=None):
     if v:
         print v
-    else:
-        print
+        sys.stdout.flush()
 
+def dassert(v=None):
+    v()
 
+def log(v=None):
+    pass
+    #fprint(v)
 
-def is_concrete(val):
-    return val.concrete
+def tracerun(v=None):
+    sys.stdout.write(v)
+    sys.stdout.flush()
+
+def info(v=None): fprint()
+
+def is_concrete(val): return val.concrete
 
 def to_str(root):
-    if not isinstance(root, dict):
-        return root
-    myargs = []
-    for i in root['args']:
-        myargs.append(to_str(i))
+    if not isinstance(root, dict): return root
+    myargs = (to_str(i) for i in root['args'])
     return root['fmt'] % tuple(myargs)
 
 class Program:
     ARG_PREFIX = 'sym_arg'
     def __init__(self, exe):
         self.exe = exe
-        self.project = angr.Project(exe, load_options={'auto_load_libs': False},
+        self.project = angr.Project(exe,
+                load_options={'auto_load_libs': False},
                 main_opts={'custom_base_addr': 0x4000000000},
                 )
         self.vars = []
         self.pimpl = pimpl.PImpl(self)
         self.comparisons_with = {}
+        self.is_running = False
+        self.constraints = {'pre':[], 'running':[], 'post':[]}
 
     def set_input(self, arg):
         self.arg1 = self.make_symbolic_char_args(arg)
         self.initial_state = self.project.factory.entry_state(
                 args=[self.exe, self.arg1],
                 add_options=angr.options.unicorn,
-                remove_options=angr.options.simplification
-                )
+                remove_options=angr.options.simplification)
         self.constrain_input_chars(self.initial_state, self.arg1a, arg)
         self.string_terminate(self.initial_state, self.arg1a, arg)
         self.simgr = self.project.factory.simgr(self.initial_state, mode='tracing')
         self.runner = tracer.QEMURunner(binary=self.exe, input='', project=self.project, argv=[self.exe, arg])
         self.simgr.use_technique(angr.exploration_techniques.Tracer(trace=self.runner.trace))
         self.seen = {}
-        for i in range(len(arg)+1): self.comparisons_with[i] = []
+        self.reset_comparisons()
+
+    def reset_comparisons(self):
+        self.comparisons_with = {i:[] for i in range(len(self.arg1a))}
 
     def get_var_val(self, c):
-        val = c.args[0]
-        var = c.args[1]
+        val, var = c.args[0], c.args[1]
         if val.symbolic:
             assert var.concrete
             return val, var
@@ -72,6 +80,7 @@ class Program:
     # idea: we need only variables that relate to input bytes
     # wipe out any symbolics
     def transform(self, c, parent=None):
+        assert not self.is_running
         return self.pimpl.transform(c, parent)
 
     def get_bool_op(self, p):
@@ -101,38 +110,32 @@ class Program:
         return to_str(val), idx, int(cmax), int(cmin)
 
 
-    def show_initial_constraints(self):
+    def save_initial_constraints(self):
         assert len(self.simgr.active) == 1
         for c in self.simgr.active[0].solver.constraints:
             if c.cache_key in self.seen: continue
             self.seen[c.cache_key] = True
-            assert self.simgr.active[0].solver.eval(c)
-            v = self.transform(c, {})
-            if self.vars:
-                info(to_str(v))
-                for v in self.vars:
-                    s, idx, cmax, cmin = self.extract(v)
-                    self.comparisons_with[idx].append((cmin, cmax))
-                    log(">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax))
-            self.vars = []
-    def show_final_constraints(self):
+            self.constraints['pre'].append(c)
+
+    def save_final_constraints(self):
         for c in self.simgr.deadended[0].solver.constraints:
             assert self.simgr.deadended[0].solver.eval(c)
-            v = self.transform(c)
-            if self.vars: info(to_str(v))
-            for v in self.vars:
-                s, idx, cmax, cmin = self.extract(v)
-                self.comparisons_with[idx].append((cmin, cmax))
-                log(">\t%s\t[%d]\t{%d,%d}" % (s, idx, cmin, cmax))
-            self.vars = []
+            self.constraints['post'].append(c)
 
-    def show_constraints(self):
+    def save_constraints(self):
+        new_constraint = False
         for c in self.simgr.active[0].solver.constraints:
             if c.cache_key in self.seen:
                 continue
             self.seen[c.cache_key] = True
-            assert self.simgr.active[0].solver.eval(c)
+            dassert(lambda: self.simgr.active[0].solver.eval(c))
+            self.constraints['running'].append(c)
+            new_constraint = True
+        return new_constraint
 
+    def transform_constraints(self, constraints):
+        log("pre")
+        for c in constraints:
             v = self.transform(c)
             if self.vars: info(to_str(v))
             for v in self.vars:
@@ -142,13 +145,13 @@ class Program:
             self.vars = []
 
     def run(self):
+        self.is_running = True
         while len(self.simgr.active) >= 1:
-            # sys.stdout.write('_')
             assert len(self.simgr.active) == 1
-            self.show_constraints()
-
+            if self.save_constraints(): tracerun('_')
             self.simgr.step()
-            sys.stdout.flush()
+        tracerun("\n")
+        self.is_running = False
 
     def string_terminate(self, state, symarg, inarg):
         self.initial_state.preconstrainer.preconstrain(0, symarg[len(inarg)])
@@ -171,14 +174,26 @@ class Program:
 def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
-    prog.show_initial_constraints()
-    info()
+    prog.save_initial_constraints()
+    fprint('run[')
     prog.run()
+    fprint(']run')
+    prog.save_final_constraints()
     info()
-    prog.show_final_constraints()
-    info()
-    for k in sorted(prog.comparisons_with.keys()):
-        print k, prog.comparisons_with[k]
+    fprint('----')
+    prog.transform_constraints(prog.constraints['pre'])
+    for k in sorted(prog.comparisons_with.keys()): print k, prog.comparisons_with[k]
+    fprint()
+
+    prog.reset_comparisons()
+    prog.transform_constraints(prog.constraints['running'])
+    for k in sorted(prog.comparisons_with.keys()): print k, prog.comparisons_with[k]
+    fprint()
+
+    prog.reset_comparisons()
+    prog.transform_constraints(prog.constraints['post'])
+    for k in sorted(prog.comparisons_with.keys()): print k, prog.comparisons_with[k]
+    fprint()
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
