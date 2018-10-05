@@ -21,8 +21,8 @@ def fprint(v=None):
         print(v)
         sys.stdout.flush()
 
-def dassert(v=None):
-    v()
+def dassert(v=None): pass
+    #assert v()
 
 def log(v=None):
     pass
@@ -127,8 +127,7 @@ class Program:
     def save_constraints(self):
         new_constraint = False
         for c in self.simgr.active[0].solver.constraints:
-            if c.cache_key in self.seen:
-                continue
+            if c.cache_key in self.seen: continue
             self.seen[c.cache_key] = True
             dassert(lambda: self.simgr.active[0].solver.eval(c))
             self.constraints['running'].append(c)
@@ -150,6 +149,7 @@ class Program:
         self.is_running = True
         while len(self.simgr.active) >= 1:
             assert len(self.simgr.active) == 1
+            # assert self.simgr.active[0].satisfiable()
             if self.save_constraints(): tracerun('_')
             self.simgr.step()
         tracerun("\n")
