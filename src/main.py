@@ -13,10 +13,11 @@ import random
 import claripy
 import tracer
 import pimpl
+from functools import reduce
 
 def fprint(v=None):
     if v:
-        print v
+        print(v)
         sys.stdout.flush()
 
 def dassert(v=None):
@@ -45,7 +46,7 @@ class Program:
         self.exe = exe
         self.project = angr.Project(exe,
                 load_options={'auto_load_libs': False},
-                main_opts={'custom_base_addr': 0x4000000000},
+                main_opts={'base_addr': 0x4000000000},
                 )
         self.vars = []
         self.pimpl = pimpl.PImpl(self)
@@ -62,7 +63,7 @@ class Program:
         self.constrain_input_chars(self.initial_state, self.arg1a, arg)
         self.string_terminate(self.initial_state, self.arg1a, arg)
         self.simgr = self.project.factory.simgr(self.initial_state, mode='tracing')
-        self.runner = tracer.QEMURunner(binary=self.exe, input='', project=self.project, argv=[self.exe, arg])
+        self.runner = tracer.QEMURunner(binary=self.exe, input=b'', project=self.project, argv=[self.exe, arg])
         self.simgr.use_technique(angr.exploration_techniques.Tracer(trace=self.runner.trace))
         self.seen = {}
         self.reset_comparisons()
@@ -182,17 +183,17 @@ def main(exe, arg):
     info()
     fprint('----')
     prog.transform_constraints(prog.constraints['pre'])
-    for k in sorted(prog.comparisons_with.keys()): print k, prog.comparisons_with[k]
+    for k in sorted(prog.comparisons_with.keys()): print(k, prog.comparisons_with[k])
     fprint()
 
     prog.reset_comparisons()
     prog.transform_constraints(prog.constraints['running'])
-    for k in sorted(prog.comparisons_with.keys()): print k, prog.comparisons_with[k]
+    for k in sorted(prog.comparisons_with.keys()): print(k, prog.comparisons_with[k])
     fprint()
 
     prog.reset_comparisons()
     prog.transform_constraints(prog.constraints['post'])
-    for k in sorted(prog.comparisons_with.keys()): print k, prog.comparisons_with[k]
+    for k in sorted(prog.comparisons_with.keys()): print(k, prog.comparisons_with[k])
     fprint()
 
 if __name__ == '__main__':

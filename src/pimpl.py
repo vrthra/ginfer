@@ -12,7 +12,7 @@ class PImpl:
         if func:
             return func(c, p)
         else:
-            print c.op
+            print(c.op)
             assert False
 
     # idea: we need only variables that relate to input bytes
