@@ -175,16 +175,12 @@ class Program:
         self.arg1a = [self.arg1h[k] for k in arg1k]
         return reduce(lambda x,y: x.concat(y), self.arg1a)
 
+
 Printable = sorted([i for i in string.printable])
-
 def to_ascii(c):
-    if c >= ord(Printable[0]) and c < ord(Printable[-1]):
-        return chr(c)
-    return c
+    return chr(c) if c >= ord(Printable[0]) and c < ord(Printable[-1]) else c
 
-
-def to_char(lst):
-    return [to_ascii(x) if x == y else (x,y) for (x,y) in lst]
+def to_char(lst): return [to_ascii(x) if x == y else (x,y) for (x,y) in lst]
 
 def main(exe, arg):
     prog = Program(exe)
