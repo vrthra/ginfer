@@ -30,7 +30,7 @@ class PImpl:
             return "%s" % self.chars[val]
         if val < 128:
             return "'%s'" % self.chars[val]
-        d = sys.getsizeof(val)
+        d = sys.getsizeof(val, 28)
         fmt = '{:0%dx}' % d
         return '%d' % d
         #return repr(str(bytearray.fromhex(fmt.format(val))).replace('\x00', ''))

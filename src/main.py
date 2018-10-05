@@ -159,7 +159,7 @@ class Program:
 
     def constrain_input_chars(self, state, symarg, sarg):
         for i,a in enumerate(sarg):
-            self.initial_state.preconstrainer.preconstrain(a, symarg[i])
+            self.initial_state.preconstrainer.preconstrain(a.encode('utf-8'), symarg[i])
 
     def make_symbolic_char_args(self, instr, symbolic=True):
         if not symbolic: return instr

@@ -1,4 +1,4 @@
-python=/usr/bin/pypy
+python=/usr/bin/python3
 kind=tdr
 subject=./subjects/expr.$(kind)
 ifeq ($(DEBUG),y)
@@ -13,7 +13,7 @@ arg='(1+4*(1+8+(1+9))/(1+4*(1+8+(1+9)))+1+4*(1+8+(1+9))/(1+4*(1+8+(1+9)))*1+4*1+
 arg='(1+4/1+4/(1+4)*1+4*1+4)'
 
 run:
-	python $(debug) ./src/main.py $(subject) $(arg)
+	$(python) $(debug) ./src/main.py $(subject) $(arg)
 
 test:
 	$(subject) $(arg)
