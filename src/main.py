@@ -194,14 +194,6 @@ def main(exe, arg):
     prog.save_final_constraints()
     info()
     fprint('----')
-    prog.transform_constraints(prog.constraints['pre'])
-    for k in sorted(prog.comparisons_with.keys()): print(k, to_char(prog.comparisons_with[k]))
-    fprint('')
-
-    prog.reset_comparisons()
-    prog.transform_constraints(prog.constraints['running'])
-    for k in sorted(prog.comparisons_with.keys()): print(k, to_char(prog.comparisons_with[k]))
-    fprint('')
 
     prog.reset_comparisons()
     prog.transform_constraints(prog.constraints['post'])
