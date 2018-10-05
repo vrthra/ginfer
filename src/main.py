@@ -1,4 +1,5 @@
 import pudb
+import string
 breakpoint = pudb.set_trace
 import logging
 logging.getLogger('angr').setLevel(logging.CRITICAL)
@@ -172,6 +173,17 @@ class Program:
         self.arg1a = [self.arg1h[k] for k in arg1k]
         return reduce(lambda x,y: x.concat(y), self.arg1a)
 
+Printable = sorted([i for i in string.printable])
+
+def to_ascii(c):
+    if c >= ord(Printable[0]) and c < ord(Printable[-1]):
+        return chr(c)
+    return c
+
+
+def to_char(lst):
+    return [to_ascii(x) if x == y else (x,y) for (x,y) in lst]
+
 def main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
@@ -183,17 +195,17 @@ def main(exe, arg):
     info()
     fprint('----')
     prog.transform_constraints(prog.constraints['pre'])
-    for k in sorted(prog.comparisons_with.keys()): print(k, prog.comparisons_with[k])
+    for k in sorted(prog.comparisons_with.keys()): print(k, to_char(prog.comparisons_with[k]))
     fprint('')
 
     prog.reset_comparisons()
     prog.transform_constraints(prog.constraints['running'])
-    for k in sorted(prog.comparisons_with.keys()): print(k, prog.comparisons_with[k])
+    for k in sorted(prog.comparisons_with.keys()): print(k, to_char(prog.comparisons_with[k]))
     fprint('')
 
     prog.reset_comparisons()
     prog.transform_constraints(prog.constraints['post'])
-    for k in sorted(prog.comparisons_with.keys()): print(k, prog.comparisons_with[k])
+    for k in sorted(prog.comparisons_with.keys()): print(k, to_char(prog.comparisons_with[k]))
     fprint()
 
 if __name__ == '__main__':
