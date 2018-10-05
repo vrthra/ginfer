@@ -148,6 +148,8 @@ class Program:
     def run(self):
         self.is_running = True
         while len(self.simgr.active) >= 1:
+            assert len(self.simgr.unconstrained) == 0
+            assert len(self.simgr.unsat) == 0
             assert len(self.simgr.active) == 1
             # assert self.simgr.active[0].satisfiable()
             if self.save_constraints(): tracerun('_')
