@@ -47,7 +47,7 @@ class Program:
         self.exe = exe
         self.project = angr.Project(exe,
                 load_options={'auto_load_libs': False},
-                main_opts={'base_addr': 0x4000000000},
+                main_opts={'base_addr':0x400000},
                 )
         self.vars = []
         self.pimpl = pimpl.PImpl(self)
@@ -193,6 +193,9 @@ def main(exe, arg):
     fprint('run[')
     prog.run()
     fprint('] return=%d crashed: %s' % (prog.runner.returncode, prog.runner.crash_mode))
+    e = prog.simgr.deadended[0].history.events[-1]
+    assert(e.type == 'terminate')
+    print(e.objects)
     prog.save_final_constraints()
     info()
     fprint('----')
