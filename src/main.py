@@ -190,7 +190,7 @@ def main(exe, arg):
     prog.save_initial_constraints()
     fprint('run[')
     prog.run()
-    fprint('] return=%d' % prog.runner.returncode)
+    fprint('] return=%d crashed: %s' % (prog.runner.returncode, prog.runner.crash_mode))
     prog.save_final_constraints()
     info()
     fprint('----')
