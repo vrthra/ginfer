@@ -1,6 +1,7 @@
 import pudb
 import string
-breakpoint = pudb.set_trace
+from functools import reduce
+bp = pudb.set_trace
 import logging
 logging.getLogger('angr').setLevel(logging.CRITICAL)
 logging.getLogger('tracer.qemu_runner').setLevel(logging.CRITICAL)
@@ -169,8 +170,8 @@ class Program:
         input_len = len(instr)
         largs = range(0, input_len+1)
         arg1k = ['%s_%d' % (Program.ARG_PREFIX, i) for i in largs]
-        self.arg1k8 = {'%s_%d_%d_8' % (Program.ARG_PREFIX, i,i):i for i in largs}
-        self.arg1h = {k:claripy.BVS(k, 8) for k in arg1k}
+        self.arg1k8 = {'%s_%d' % (Program.ARG_PREFIX, i):i for i in largs}
+        self.arg1h = {k:claripy.BVS(k, 8, explicit_name=True) for k in arg1k}
         self.arg1h_ = {self.arg1h[k].args[0]:k for k in arg1k}
         self.arg1a = [self.arg1h[k] for k in arg1k]
         return reduce(lambda x,y: x.concat(y), self.arg1a)
@@ -182,7 +183,20 @@ def to_ascii(c):
 
 def to_char(lst): return [to_ascii(x) if x == y else (x,y) for (x,y) in lst]
 
-def main(exe, arg):
+def get_constraints(exe, arg):
+    prog = Program(exe)
+    prog.set_input(arg)
+    prog.save_initial_constraints()
+    prog.run()
+    retcode = prog.runner.returncode
+    prog.save_final_constraints()
+    prog.reset_comparisons()
+    prog.transform_constraints(prog.constraints['post'])
+    return prog.comparisons_with
+    #return [(k, prog.comparisons_with[k]) for k in sorted(prog.comparisons_with.keys())]
+
+
+def _main(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
     prog.save_initial_constraints()
@@ -200,6 +214,21 @@ def main(exe, arg):
     prog.transform_constraints(prog.constraints['post'])
     for k in sorted(prog.comparisons_with.keys()): print(k, to_char(prog.comparisons_with[k]))
     fprint()
+
+def find_star(exe, orig_cons, arg):
+    # first double all chars
+    doubled = ''.join([j for i in arg for j in (i,i)])
+    # then look inside orig_cons where they match
+    print(doubled)
+    doubled_cons = get_constraints(exe, doubled)
+    for i,p in enumerate(orig_cons):
+        print(orig_cons[i] == doubled_cons[i*2])
+        print()
+
+
+def main(exe, arg):
+    rng = get_constraints(exe, arg)
+    find_star(exe, rng, arg)
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
