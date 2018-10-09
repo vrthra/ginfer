@@ -183,7 +183,7 @@ def to_ascii(c):
 
 def to_char(lst): return [to_ascii(x) if x == y else (x,y) for (x,y) in lst]
 
-def get_constraints(exe, arg):
+def get_constraint_ranges(exe, arg):
     prog = Program(exe)
     prog.set_input(arg)
     prog.save_initial_constraints()
@@ -215,20 +215,37 @@ def _main(exe, arg):
     for k in sorted(prog.comparisons_with.keys()): print(k, to_char(prog.comparisons_with[k]))
     fprint()
 
-def find_star(exe, orig_cons, arg):
-    # first double all chars
-    doubled = ''.join([j for i in arg for j in (i,i)])
-    # then look inside orig_cons where they match
-    print(doubled)
-    doubled_cons = get_constraints(exe, doubled)
-    for i,p in enumerate(orig_cons):
-        print(orig_cons[i] == doubled_cons[i*2])
-        print()
+def simplify_args(exe, orig_crange, arg):
+    # look at the constraint ranges.
+    # If a constraint repeats, it is candidate
+    # for shrinkage
+    shrink = []
+    for i in orig_crange:
+        if i == 0: continue
+        if orig_crange[i] == orig_crange[i-1]:
+            shrink.append(i)
+    return shrink
+
+def shrink_arg(shrink, arg):
+    new_arg = []
+    star = {}
+    for i,a in enumerate(arg):
+        if i in shrink:
+            star[len(new_arg)-1] = True
+            continue
+        new_arg.append(a)
+    return (''.join(new_arg), star)
 
 
 def main(exe, arg):
-    rng = get_constraints(exe, arg)
-    find_star(exe, rng, arg)
+    rng = get_constraint_ranges(exe, arg)
+    shrink = simplify_args(exe, rng, arg)
+    normalized_arg, star = shrink_arg(shrink, arg)
+    print(normalized_arg)
+    for i in star:
+        print(i, star[i])
+
+    return 0
 
 if __name__ == '__main__':
     assert len(sys.argv) >= 3
