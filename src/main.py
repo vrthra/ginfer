@@ -192,7 +192,7 @@ def get_constraint_ranges(exe, arg):
     prog.save_final_constraints()
     prog.reset_comparisons()
     prog.transform_constraints(prog.constraints['post'])
-    return prog.comparisons_with
+    return (retcode, prog.comparisons_with)
     #return [(k, prog.comparisons_with[k]) for k in sorted(prog.comparisons_with.keys())]
 
 
@@ -226,24 +226,65 @@ def simplify_args(exe, orig_crange, arg):
             shrink.append(i)
     return shrink
 
-def shrink_arg(shrink, arg):
+def shrink_arg(shrink, arg, rng):
     new_arg = []
     star = {}
+    rngs = {}
     for i,a in enumerate(arg):
         if i in shrink:
             star[len(new_arg)-1] = True
             continue
         new_arg.append(a)
-    return (''.join(new_arg), star)
+        rngs[len(new_arg)-1] = rng[i]
+    rngs[len(new_arg)] = rng[len(arg)]
+    return (''.join(new_arg), star, rngs)
 
+def get_new_arg(arg, k, n):
+    if k == 0:
+        return arg[k] * n + arg[k+1:]
+    return arg[0:k] + arg[k] * n + arg[k+1:]
+
+def verify_star(rng, nrng, k, l, n):
+    for i in range(0, k):
+        if rng[i] != nrng[i]:
+            return False
+    for i in range(0, n):
+        if rng[k] != nrng[k+i]:
+            return False
+
+    for i in range(k+1,l):
+        if rng[i] != nrng[i+n-1]: # repeats n times - original = n-1
+            return False
+    return True
+
+
+N_Tries = 4
+
+def expand_arg(exe, arg, rng):
+    l = len(arg)
+    star = {}
+    for k in range(0, l):
+        #if k!= 0: bp()
+        for i in range(1,N_Tries):
+            narg = get_new_arg(arg, k, 2**i)
+            print(narg)
+            (r, nrng) = get_constraint_ranges(exe, narg)
+            if r != 0 or not verify_star(rng, nrng, k, l, 2**i):
+                star[k] = False
+                break
+    return star
 
 def main(exe, arg):
-    rng = get_constraint_ranges(exe, arg)
+    (r, rng) = get_constraint_ranges(exe, arg)
     shrink = simplify_args(exe, rng, arg)
-    normalized_arg, star = shrink_arg(shrink, arg)
+    normalized_arg, star_, srng = shrink_arg(shrink, arg, rng)
     print(normalized_arg)
-    for i in star:
-        print(i, star[i])
+    # (r, srng_) = get_constraint_ranges(exe, normalized_arg)
+    # assert srng == srng_
+    # for i in star_: print(i, star_[i])
+    # Now, start at one, and see how many can be doubled.
+    star = expand_arg(exe, normalized_arg, srng)
+    for i in star: print(i, star[i])
 
     return 0
 
